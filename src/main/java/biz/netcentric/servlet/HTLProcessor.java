@@ -14,6 +14,7 @@ import javax.servlet.ServletException;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.select.Elements;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ImporterTopLevel;
 import org.mozilla.javascript.NativeJavaObject;
@@ -24,6 +25,7 @@ public class HTLProcessor extends HttpServlet
 {
     private static final String CHARSET_NAME = "UTF-8";
     private static final String DEFAULT_PATH = "/";
+    private static final String DATA_IF_ATTR_NAME = "data-if";
     private static final String EXPR_PREFIX = "${";
     private static final String EXPR_SUFFIX = "}";
     private static final String INDEX_PATH = "/index.html";
@@ -63,6 +65,7 @@ public class HTLProcessor extends HttpServlet
             scope.put("child", scope, new NativeJavaObject(scope, "", String.class));
             context.evaluateString(scope, jsCode, JS_SOURCE_NAME, 1, null);
 
+            evaluateIfExpressions(htmlDoc, context, scope);
             String evaluatedHTML = evaluateExpressions(htmlDoc, context, scope);
             responseBuilder.append(evaluatedHTML);
         }
@@ -90,6 +93,23 @@ public class HTLProcessor extends HttpServlet
             printResponse(response, responseBuilder.toString());
             Context.exit();
         }
+    }
+
+    void evaluateIfExpressions(Document htmlDoc, Context context, ScriptableObject scope)
+    {
+        Elements dataIfElements = htmlDoc.getElementsByAttributeStarting(DATA_IF_ATTR_NAME);
+        dataIfElements.stream().forEach((element) -> {
+            Object result =
+                context.evaluateString(
+                    scope, element.attr(DATA_IF_ATTR_NAME), JS_SOURCE_NAME, 1, null);
+
+            if (!Boolean.valueOf(result.toString()))
+            {
+                element.remove();
+            }
+
+            element.removeAttr(DATA_IF_ATTR_NAME);
+        });
     }
 
     String evaluateExpressions(Document htmlDoc, Context context, ScriptableObject scope)
