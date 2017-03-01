@@ -11,10 +11,12 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.ServletException;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ImporterTopLevel;
+import org.mozilla.javascript.NativeJavaObject;
 import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.ScriptableObject;
 
@@ -26,6 +28,7 @@ public class HTLProcessor extends HttpServlet
     private static final String JS_ATTR_VAL = "server/javascript";
     private static final String JS_SOURCE_NAME = "<code>";
     private static final String REQUEST_OBJ_KEY = "request";
+    private static final String RESPONSE_CONTENT_TYPE = "text/html;charset=UTF-8";
     private static final String TYPE_ATTR_KEY = "type";
 
     private ServletConfig servletConfig;
@@ -55,11 +58,11 @@ public class HTLProcessor extends HttpServlet
             Context context = Context.enter();
             ScriptableObject scope = new ImporterTopLevel(context);
             scope.put(REQUEST_OBJ_KEY, scope, request);
+            scope.put("child", scope, new NativeJavaObject(scope, "", String.class));
             context.evaluateString(scope, jsCode, JS_SOURCE_NAME, 1, null);
 
-            // TODO create a helper methods to find the special HTML tags and process them using the
-            //      JS objects
-            responseBuilder.append("<pre>" + htmlDoc.html() + "</pre>");
+            String evaluatedHTML = evaluateExpressions(htmlDoc, context, scope);
+            responseBuilder.append(evaluatedHTML);
         }
         catch (FileNotFoundException | NullPointerException exception)
         {
@@ -87,6 +90,25 @@ public class HTLProcessor extends HttpServlet
         }
     }
 
+    String evaluateExpressions(Document htmlDoc, Context context, ScriptableObject scope)
+    {
+        String html = htmlDoc.html();
+        String[] expressions = StringUtils.split(html, "${");
+        for (int i = 0; i < expressions.length; i++)
+        {
+            if (expressions[i].indexOf("}") > 0)
+            {
+                String expression = expressions[i].substring(0, expressions[i].indexOf("}"));
+                Object result = context.evaluateString(scope, expression, JS_SOURCE_NAME, 1, null);
+                NativeJavaObject nativeJavaObject = (NativeJavaObject)result;
+                Object unwrappedVal = nativeJavaObject.unwrap();
+                expressions[i] = expressions[i].replace(expression + "}", unwrappedVal.toString());
+            }
+        }
+
+        return StringUtils.join(expressions);
+    }
+
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
     throws ServletException, IOException
@@ -104,18 +126,10 @@ public class HTLProcessor extends HttpServlet
     private void printResponse(HttpServletResponse response, String text)
     throws IOException
     {
-        response.setContentType("text/html;charset=UTF-8");
+        response.setContentType(RESPONSE_CONTENT_TYPE);
         try (PrintWriter out = response.getWriter())
         {
-            out.println("<!DOCTYPE html>");
-            out.println("<html>");
-            out.println("<head>");
-            out.println("<title>HTL Processor</title>");
-            out.println("</head>");
-            out.println("<body>");
             out.println(text);
-            out.println("</body>");
-            out.println("</html>");
         }
     }
 }
