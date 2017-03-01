@@ -24,6 +24,8 @@ public class HTLProcessor extends HttpServlet
 {
     private static final String CHARSET_NAME = "UTF-8";
     private static final String DEFAULT_PATH = "/";
+    private static final String EXPR_PREFIX = "${";
+    private static final String EXPR_SUFFIX = "}";
     private static final String INDEX_PATH = "/index.html";
     private static final String JS_ATTR_VAL = "server/javascript";
     private static final String JS_SOURCE_NAME = "<code>";
@@ -93,17 +95,15 @@ public class HTLProcessor extends HttpServlet
     String evaluateExpressions(Document htmlDoc, Context context, ScriptableObject scope)
     {
         String html = htmlDoc.html();
-        String[] expressions = StringUtils.split(html, "${");
-        for (int i = 0; i < expressions.length; i++)
+        String[] expressions = StringUtils.split(html, EXPR_PREFIX);
+        for (int i = 1; i < expressions.length; i++)
         {
-            if (expressions[i].indexOf("}") > 0)
-            {
-                String expression = expressions[i].substring(0, expressions[i].indexOf("}"));
-                Object result = context.evaluateString(scope, expression, JS_SOURCE_NAME, 1, null);
-                NativeJavaObject nativeJavaObject = (NativeJavaObject)result;
-                Object unwrappedVal = nativeJavaObject.unwrap();
-                expressions[i] = expressions[i].replace(expression + "}", unwrappedVal.toString());
-            }
+            String expression = expressions[i].substring(0, expressions[i].indexOf(EXPR_SUFFIX));
+            Object result = context.evaluateString(scope, expression, JS_SOURCE_NAME, 1, null);
+            NativeJavaObject nativeJavaObject = (NativeJavaObject)result;
+            Object unwrappedVal = nativeJavaObject.unwrap();
+            expressions[i] =
+                expressions[i].replace(expression + EXPR_SUFFIX, unwrappedVal.toString());
         }
 
         return StringUtils.join(expressions);
