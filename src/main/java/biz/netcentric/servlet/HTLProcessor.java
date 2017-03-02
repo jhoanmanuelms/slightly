@@ -5,6 +5,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Optional;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -13,6 +15,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.ServletException;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Attribute;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 import org.mozilla.javascript.Context;
@@ -25,6 +28,8 @@ public class HTLProcessor extends HttpServlet
 {
     private static final String CHARSET_NAME = "UTF-8";
     private static final String DEFAULT_PATH = "/";
+    private static final String DATA_FOR_ATTR_PREFIX = "data-for";
+    private static final int DATA_FOR_X_IDX = 2;
     private static final String DATA_IF_ATTR_NAME = "data-if";
     private static final String EXPR_PREFIX = "${";
     private static final String EXPR_SUFFIX = "}";
@@ -62,12 +67,11 @@ public class HTLProcessor extends HttpServlet
             Context context = Context.enter();
             ScriptableObject scope = new ImporterTopLevel(context);
             scope.put(REQUEST_OBJ_KEY, scope, request);
-            scope.put("child", scope, new NativeJavaObject(scope, "", String.class));
             context.evaluateString(scope, jsCode, JS_SOURCE_NAME, 1, null);
 
             evaluateIfExpressions(htmlDoc, context, scope);
-            String evaluatedHTML = evaluateExpressions(htmlDoc, context, scope);
-            responseBuilder.append(evaluatedHTML);
+            evaluateForExpressions(htmlDoc, context, scope);
+            responseBuilder.append(evaluateExpressions(htmlDoc, context, scope));
         }
         catch (FileNotFoundException | NullPointerException exception)
         {
@@ -112,6 +116,30 @@ public class HTLProcessor extends HttpServlet
         });
     }
 
+    void evaluateForExpressions(Document htmlDoc, Context context, ScriptableObject scope)
+    {
+        Elements dataIfElements = htmlDoc.getElementsByAttributeStarting(DATA_FOR_ATTR_PREFIX);
+        dataIfElements.stream().forEach((element) -> {
+            Optional<Attribute> forAttr =
+                element.attributes().asList().stream().filter(
+                    attribute -> attribute.getKey().startsWith(DATA_FOR_ATTR_PREFIX)).findFirst();
+            String fullForAttr = forAttr.get().getKey();
+            String forAttrWildcard = fullForAttr.split("-")[DATA_FOR_X_IDX];
+            Object result =
+                context.evaluateString(scope, element.attr(fullForAttr), JS_SOURCE_NAME, 1, null);
+            NativeJavaObject nativeJavaObject = (NativeJavaObject)result;
+            List<String> unwrappedVal = (List<String>)nativeJavaObject.unwrap();
+            element.removeAttr(fullForAttr);
+
+            unwrappedVal.stream().forEach(forElement -> {
+                String elemHTML = element.outerHtml();
+                elemHTML = elemHTML.replace(EXPR_PREFIX + forAttrWildcard + EXPR_SUFFIX, forElement);
+                element.before(elemHTML);
+            });
+            element.remove();
+        });
+    }
+
     String evaluateExpressions(Document htmlDoc, Context context, ScriptableObject scope)
     {
         String html = htmlDoc.html();
@@ -120,8 +148,8 @@ public class HTLProcessor extends HttpServlet
         {
             String expression = expressions[i].substring(0, expressions[i].indexOf(EXPR_SUFFIX));
             Object result = context.evaluateString(scope, expression, JS_SOURCE_NAME, 1, null);
-            NativeJavaObject nativeJavaObject = (NativeJavaObject)result;
-            Object unwrappedVal = nativeJavaObject.unwrap();
+            Object unwrappedVal =
+                result instanceof NativeJavaObject ? ((NativeJavaObject)result).unwrap() : result;
             expressions[i] =
                 expressions[i].replace(expression + EXPR_SUFFIX, unwrappedVal.toString());
         }

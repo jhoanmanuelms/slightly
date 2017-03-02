@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<!--
+  -- Test file used to prove the scenario a HTL template is used to create objects of a different
+  -- entity. In this case, the Book entity.
+  -->
+<html>
+<script type="server/javascript">
+  importClass(Packages.biz.netcentric.entity.Book)
+  var name = request.getParameter("name")
+  var author = request.getParameter("author")
+  var year = request.getParameter("year")
+  var book = new Book(name, author, parseInt(year), "Genre0", "Genre1", "Genre2")
+</script>
+<head>
+<title>${book.name}</title>
+</head>
+<body>
+  <h1 title="${book.name}">Book: ${book.name}</h1>
+  <h2 title="${book.author}">Book: ${book.author}</h2>
+  <div data-if="book.year > 1990" title="${book.year}">
+    <h2>Year: ${book.year}</h2>
+  </div>
+  <div data-for-genre="book.genres">
+    <h2>Genre: ${genre}</h2>
+  </div>
+</body>
+</html>

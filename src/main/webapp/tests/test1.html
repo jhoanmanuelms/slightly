@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!--
+  -- Test file used to prove the scenario where a data-for-x element is placed inside a data-if
+  -- element. In this case it's expected that the elements for data-for-x are generated only if the
+  -- expression in the data-if element is evaluated to "true".
+  -->
+<html>
+<script type="server/javascript">
+  importClass(Packages.biz.netcentric.entity.Person)
+  var id = request.getParameter("id")
+  var person = Person.lookup(id)
+</script>
+<head>
+<title>${person.name}</title>
+</head>
+<body>
+  <h1 title="${person.name}">${person.name}</h1>
+  <div data-if="person.married" title="${person.spouse}">
+    <h2>Spouse: ${person.spouse}</h2>
+    <div data-for-child="person.children">Child: ${child}</div>
+  </div>
+</body>
+</html>
