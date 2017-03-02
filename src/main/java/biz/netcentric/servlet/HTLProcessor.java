@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Optional;
@@ -45,49 +46,49 @@ import org.mozilla.javascript.ScriptableObject;
 public class HTLProcessor extends HttpServlet
 {
     /** Charset used to load the HTML document. */
-    private static final String CHARSET_NAME = "UTF-8";
+    static final String CHARSET_NAME = "UTF-8";
 
     /** Default path received by the servlet when no file is specified. */
-    private static final String DEFAULT_PATH = "/";
+    static final String DEFAULT_PATH = "/";
 
     /** Prefix of the attribute used for data-for-x expressions. */
-    private static final String DATA_FOR_ATTR_PREFIX = "data-for";
+    static final String DATA_FOR_ATTR_PREFIX = "data-for";
 
     /** Index of the "x" variable in the data-for-x expressions. */
-    private static final int DATA_FOR_X_IDX = 2;
+    static final int DATA_FOR_X_IDX = 2;
 
     /** Name of the attribute used for data-if expressions. */
-    private static final String DATA_IF_ATTR_NAME = "data-if";
+    static final String DATA_IF_ATTR_NAME = "data-if";
 
     /** Prefix used for $-expressions. */
-    private static final String EXPR_PREFIX = "${";
+    static final String EXPR_PREFIX = "${";
 
     /** Suffix used for $-expressions. */
-    private static final String EXPR_SUFFIX = "}";
+    static final String EXPR_SUFFIX = "}";
 
     /** Path for the index.html file. */
-    private static final String INDEX_PATH = "/index.html";
+    static final String INDEX_PATH = "/index.html";
 
     /**
      * Name of the attribute expected to be used in the {@code <script>} tag containing the
      * Javascript code to be executed by the servlet
      */
-    private static final String JS_ATTR_NAME = "type";
+    static final String JS_ATTR_NAME = "type";
 
     /**
      * Value for the attribute expected to be used in the {@code <script>} tag containing the
      * Javascript code to be executed by the servlet.
      */
-    private static final String JS_ATTR_VAL = "server/javascript";
+    static final String JS_ATTR_VAL = "server/javascript";
 
     /** Reference name used to execute Javascript code in the engine. */
-    private static final String JS_SOURCE_NAME = "<code>";
+    static final String JS_SOURCE_NAME = "<code>";
 
     /** Key used to store the request object in the Javascript execution scope. */
-    private static final String REQUEST_OBJ_KEY = "request";
+    static final String REQUEST_OBJ_KEY = "request";
 
     /** Content type used for the Servlet response. */
-    private static final String RESPONSE_CONTENT_TYPE = "text/html;charset=UTF-8";
+    static final String RESPONSE_CONTENT_TYPE = "text/html;charset=UTF-8";
 
     /** {@link javax.servlet.ServletConfig} instance used to get the servlet context. */
     private ServletConfig servletConfig;
@@ -137,15 +138,15 @@ public class HTLProcessor extends HttpServlet
         try
         {
             ServletContext servletContext = servletConfig.getServletContext();
-            File htmlFile = new File(servletContext.getResource(filePath).toURI());
+            File htmlFile = loadHTMLFile(servletContext, filePath);
             Document htmlDoc = Jsoup.parse(htmlFile, CHARSET_NAME);
 
             // Evaluate Javascript code
             String jsCode = htmlDoc.getElementsByAttributeValue(JS_ATTR_NAME, JS_ATTR_VAL).html();
             Context context = Context.enter();
-            ScriptableObject scope = new ImporterTopLevel(context);
+            ScriptableObject scope = createScope(context);
             scope.put(REQUEST_OBJ_KEY, scope, request);
-            context.evaluateString(scope, jsCode, JS_SOURCE_NAME, 1, null);
+            evaluateJS(context, scope, jsCode);
 
             evaluateIfExpressions(htmlDoc, context, scope);
             evaluateForExpressions(htmlDoc, context, scope);
@@ -191,10 +192,7 @@ public class HTLProcessor extends HttpServlet
     {
         Elements dataIfElements = htmlDoc.getElementsByAttributeStarting(DATA_IF_ATTR_NAME);
         dataIfElements.stream().forEach((element) -> {
-            Object result =
-                context.evaluateString(
-                    scope, element.attr(DATA_IF_ATTR_NAME), JS_SOURCE_NAME, 1, null);
-
+            Object result = evaluateJS(context, scope, element.attr(DATA_IF_ATTR_NAME));
             if (!Boolean.valueOf(result.toString()))
             {
                 element.remove();
@@ -229,8 +227,7 @@ public class HTLProcessor extends HttpServlet
                     attribute -> attribute.getKey().startsWith(DATA_FOR_ATTR_PREFIX)).findFirst();
             String fullForAttr = forAttr.get().getKey();
             String forAttrWildcard = fullForAttr.split("-")[DATA_FOR_X_IDX];
-            Object result =
-                context.evaluateString(scope, element.attr(fullForAttr), JS_SOURCE_NAME, 1, null);
+            Object result = evaluateJS(context, scope, element.attr(fullForAttr));
             NativeJavaObject nativeJavaObject = (NativeJavaObject)result;
             List<String> unwrappedVal = (List<String>)nativeJavaObject.unwrap();
             element.removeAttr(fullForAttr);
@@ -263,7 +260,7 @@ public class HTLProcessor extends HttpServlet
         for (int i = 1; i < expressions.length; i++)
         {
             String expression = expressions[i].substring(0, expressions[i].indexOf(EXPR_SUFFIX));
-            Object result = context.evaluateString(scope, expression, JS_SOURCE_NAME, 1, null);
+            Object result = evaluateJS(context, scope, expression);
             Object unwrappedVal =
                 result instanceof NativeJavaObject ? ((NativeJavaObject)result).unwrap() : result;
             expressions[i] =
@@ -303,6 +300,52 @@ public class HTLProcessor extends HttpServlet
     throws ServletException, IOException
     {
         processRequest(request, response);
+    }
+
+    /**
+     * Helper method that loads the file located in the given path according to the servlet context.
+     *
+     * @param servletContext Context to locate the file
+     * @param filePath Path for the required file in the given context
+     *
+     * @return A {@link File} object referencing the required file.
+     *
+     * @throws URISyntaxException If the given file path or context lead to a wrong URI.
+     * @throws MalformedURLException It the given path is not valid
+     */
+    File loadHTMLFile(ServletContext servletContext, String filePath)
+    throws URISyntaxException, MalformedURLException
+    {
+        return new File(servletContext.getResource(filePath).toURI());
+    }
+
+    /**
+     * Helper method that initializes an instance of {@link ImporterTopLevel} which can be used as
+     * scope for the JS engine. This instance is required in order to be able to access the methods
+     * to interact with Java classes from JS code like "importClass".
+     *
+     * @param context JS engine execution context.
+     *
+     * @return An instance of {@link ScriptableObject}
+     */
+    ScriptableObject createScope(Context context)
+    {
+        return new ImporterTopLevel(context);
+    }
+
+    /**
+     * Executes the given JS expression, in the JS engine, using the given context and scope.
+     *
+     * @param context JS engine execution context. This object should come from the execution of the
+     *                {@link Context#enter()} method.
+     * @param scope Scope used to execute the JS code.
+     * @param jsCode JS code to be executed.
+     *
+     * @return An object containing the result of the execution.
+     */
+    Object evaluateJS(Context context, ScriptableObject scope, String jsCode)
+    {
+        return context.evaluateString(scope, jsCode, JS_SOURCE_NAME, 1, null);
     }
 
     /**
