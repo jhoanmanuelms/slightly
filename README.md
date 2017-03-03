@@ -10,7 +10,7 @@ In order to solve the problem proposed in the coding exercise, I implemented a J
 capable of process the requested HTML template and evaluate the expressions expected to be found
 inside it. On a high level, these are the steps followed to process the template: <br />
 1. Load the requested HTML document based on the request path.<br />
-2. Evaluate Javascript code in the specified HTML document. The servlet will only evaluate code<br />
+2. Evaluate Javascript code in the specified HTML document. The servlet will only evaluate code
 contained inside a "script" tag with the "type" attribute set to "server/javascript".<br />
 3. Evaluate data-if expressions using the Javascript engine<br />
 4. Evaluate data-for-x expressions using the Javascript engine<br />
@@ -91,7 +91,6 @@ In order to execute the automated tests cases you need to follow these steps:<br
 1. Execute the command _mvn jetty:run_ in order to start the application<br />
 2. In a separate console, execute the command: _mvn test -Dtest=biz.netcentric.bdd.BDDRunner_
 
-<br />
 The automated test cases were created using Cucumber and Selenium. 
 
 ### DEVELOPMENT TOOLS
@@ -110,5 +109,7 @@ For the development of this project, I used the following tools and libraries:
 |Selenium|2.53.1|Execution of automated tests|
 |Cucumber|1.2.5|Step definitions for the automated tests|
 |Firefox|30.0|Execution of automated tests|
+|IntelliJ IDEA|2016.3.4|IDE|
 |Git|2.9.0|Version Control System|
+|Source Tree|1.9.10.0|UI for Git|
 |GitHub| |Source Repository|
