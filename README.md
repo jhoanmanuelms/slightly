@@ -113,3 +113,6 @@ For the development of this project, I used the following tools and libraries:
 |Git|2.9.0|Version Control System|
 |Source Tree|1.9.10.0|UI for Git|
 |GitHub| |Source Repository|
+
+### REPOSITORY
+This project can be found at [https://github.com/jhoanmanuelms/slightly](https://github.com/jhoanmanuelms/slightly)
