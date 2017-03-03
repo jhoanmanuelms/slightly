@@ -9,12 +9,12 @@ NetCentric.
 In order to solve the problem proposed in the coding exercise, I implemented a Java Servlet that's
 capable of process the requested HTML template and evaluate the expressions expected to be found
 inside it. On a high level, these are the steps followed to process the template: <br />
-1. Load the requested HTML document based on the request path.
-2. Evaluate Javascript code in the specified HTML document. The servlet will only evaluate code
-contained inside a "script" tag with the "type" attribute set to "server/javascript".
-3. Evaluate data-if expressions using the Javascript engine
-4. Evaluate data-for-x expressions using the Javascript engine
-5. Evaluate $-expressions
+1. Load the requested HTML document based on the request path.<br />
+2. Evaluate Javascript code in the specified HTML document. The servlet will only evaluate code<br />
+contained inside a "script" tag with the "type" attribute set to "server/javascript".<br />
+3. Evaluate data-if expressions using the Javascript engine<br />
+4. Evaluate data-for-x expressions using the Javascript engine<br />
+5. Evaluate $-expressions<br />
 6. Print out the response
 
 If there's any error in between any of these steps, the servlet will handle it and print out the
@@ -87,8 +87,8 @@ section.
 
 
 ##### Automated Tests Execution
-In order to execute the automated tests cases you need to follow these steps:
-1. Execute the command _mvn jetty:run_ in order to start the application
+In order to execute the automated tests cases you need to follow these steps:<br />
+1. Execute the command _mvn jetty:run_ in order to start the application<br />
 2. In a separate console, execute the command: _mvn test -Dtest=biz.netcentric.bdd.BDDRunner_
 
 <br />
