@@ -91,7 +91,9 @@ In order to execute the automated tests cases you need to follow these steps:<br
 1. Execute the command _mvn jetty:run_ in order to start the application<br />
 2. In a separate console, execute the command: _mvn test -Dtest=biz.netcentric.bdd.BDDRunner_
 
-The automated test cases were created using Cucumber and Selenium. 
+The automated test cases were created using Cucumber, Selenium and Mozzila Firefox version 30.0.<br />
+**Note**: Due to changes in Selenium library, the automated tests might not work properly in a
+different version of Firefox. 
 
 ### DEVELOPMENT TOOLS
 For the development of this project, I used the following tools and libraries:
